@@ -74,7 +74,7 @@ src = dlT.AlphaCen(
     position_angle=np.array(90.0),
     x_position=np.array(0.0),
     y_position=np.array(0.0),
-    log_flux=np.array(7.581),
+    log_flux=np.array(6.979),
     contrast=np.array(3.37),
 )
 

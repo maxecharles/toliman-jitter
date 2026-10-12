@@ -1,0 +1,50 @@
+# Environment for photon_count.ipynb, the photon count in Appendix A of Charles et al. 2026
+# (JATIS 12(2), 028005). The analysis scripts use environment.yml instead.
+#
+#   Linux or Intel Mac:  conda env create -f environment-pysynphot.yml
+#   Apple Silicon:       CONDA_SUBDIR=osx-64 conda env create -f environment-pysynphot.yml
+#                        conda activate pysynphot && conda config --env --set subdir osx-64
+#                        (conda-forge has no Python 3.6 for arm64, so this runs under Rosetta)
+#
+# Python 3.6 reads text files in the locale's encoding and SciencePlots' style files are UTF-8,
+# so the `variables` block at the end sets LANG=en_US.UTF-8 whenever the environment is
+# activated. If Jupyter / VS Code is started without activating it, set LANG yourself.
+#
+# The original environment was not recorded. Python 3.6.15, pysynphot 2.0.0 and matplotlib 3.3.4
+# are confirmed by the saved notebook (kernel metadata, the line numbers in its warnings) and by
+# the metadata inside figs/bandpass.*. SciencePlots 2.1.x is confirmed by the figure width. The
+# rest are the newest releases that support Python 3.6. With this environment and the data below,
+# every printed output of the published notebook (the 8.309e5 photons/s/cm^2 rate) reproduces.
+#
+# Reference data, which is not in this repository. The notebook reads it from its working
+# directory (pysynphot's PYSYN_CDBS is unset), so run it from a directory holding mtab/,
+# comp/nonhst/ and grid/phoenix/ next to throughput/ and figs/. The tarballs nest everything
+# under grp/redcat/trds/, hence --strip-components=3:
+#
+#   curl -O https://ssb.stsci.edu/trds/tarfiles/synphot1.tar.gz        # 173 MB
+#   tar -xzf synphot1.tar.gz --strip-components=3 grp/redcat/trds/mtab grp/redcat/trds/comp/nonhst
+#   curl -O https://ssb.stsci.edu/trds/tarfiles/synphot5.tar.gz        # 2.3 GB
+#   tar -xzf synphot5.tar.gz --strip-components=3 \
+#       grp/redcat/trds/grid/phoenix/catalog.fits \
+#       grp/redcat/trds/grid/phoenix/phoenixm00 grp/redcat/trds/grid/phoenix/phoenixp03
+name: pysynphot
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.6.15
+  - numpy=1.19.5
+  - scipy=1.5.3
+  - pandas=1.1.5
+  - astropy=4.1
+  - matplotlib-base=3.3.4
+  - ipykernel=5.5.5
+  - setuptools=58.0.4  # pysynphot imports pkg_resources
+  - six
+  - beautifulsoup4
+  - pip
+  - pip:
+      - pysynphot==2.0.0
+      - SciencePlots==2.1.1  # the first release with an importable scienceplots module is 2.0.0
+variables:
+  LANG: en_US.UTF-8

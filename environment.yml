@@ -1,0 +1,41 @@
+# Environment for the analysis in Charles et al. 2026, JATIS 12(2), 028005.
+#
+#   conda env create -f environment.yml
+#   conda activate toliman-jitter
+#
+# The original environment was not recorded. These pins were reconstructed from the
+# package histories and checked by running FIA.py, FIA_mvn.py and crossfitting.py
+# against the saved results/.
+name: toliman-jitter
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.12
+  - pip
+  - ipykernel
+  - ipywidgets
+  - pip:
+      # On a CUDA machine, replace the two jax lines with: jax[cuda12]==0.8.1
+      - jax==0.8.1
+      - jaxlib==0.8.1
+      - equinox==0.13.2
+      # zodiax.get_optimiser at the commit below breaks on optax >= 0.2.7 (dLux issue #306)
+      - optax==0.2.6
+      - jaxtyping==0.3.3
+      - numpy==2.3.5
+      - scipy==1.16.3
+      - matplotlib==3.10.7
+      - tqdm==4.67.1
+      - SciencePlots==2.2.0
+      - cmasher==1.9.2
+      # dLux 0.15+ needs zodiax >= 0.5, which dropped the API these scripts use
+      - dLux==0.14.1
+      # No PyPI release of zodiax has that API (0.4.1 is too old, 0.5.0 too new).
+      # This commit is main as of Feb-Nov 2025. Later commits make the sgd/adam
+      # learning-rate schedule subnormal, which underflows to zero on CPU.
+      - zodiax @ git+https://github.com/LouisDesdoigts/zodiax@eb6e51a2a2c4fa1a77ec7b1bc08b9894d0498da9
+      # Tag jatis-2026-jitter: GaussianJitter with r in 1e-6 arcsec^4, before z_oversize
+      - dLuxToliman @ git+https://github.com/maxecharles/dLuxToliman@6691ad27e45de1fceadc35e047d04b9279edc115
+
+# photon_count.ipynb is separate: it ran in a Python 3.6 env with pysynphot and
+# needs the STScI reference data described in the notebook.
