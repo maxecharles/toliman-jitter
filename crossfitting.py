@@ -42,8 +42,12 @@ ito_seven = [
     "#F0E442",
 ]
 contrast_three = ["#004488", "#BB5566", "#DDAA33"]
-# nt_files_path = "/home/max/code/tolicode/files/"
-nt_files_path = "/fred/oz440/max/code/tolicode/files/"
+# Outputs go into this repository (results/xfit/, test/), wherever the script is launched from
+try:
+    nt_files_path = os.path.dirname(os.path.abspath(__file__)) + "/"
+except NameError:  # running cell-by-cell, where __file__ is not defined
+    nt_files_path = os.path.abspath(os.getcwd()) + "/"
+os.makedirs(nt_files_path + "test", exist_ok=True)  # diagnostic plots from the fits
 
 # %% [markdown]
 # ## Priors
@@ -58,7 +62,7 @@ from jax.scipy.stats import norm, beta
 from xfitting_helpers import fwhm_to_det, det_to_fwhm, NGDToliman, NGDJitteredToliman
 
 
-def weibull_logpdf(x, k=1.2, lam=250):
+def weibull_logpdf(x, k=1.2, lam=2.5e-4):  # prior on Jitter.r, lam in arcsec^4
     x = np.asarray(x)
     return np.log(k) - k * np.log(lam) + (k - 1) * np.log(x) - (x / lam) ** k
 
@@ -194,6 +198,11 @@ src = AlphaCen(
     contrast=np.array(3.37),
 )
 
+# grad_fn's jitter_angle step multipliers were tuned at log_flux = 7.581. The preconditioner
+# is likelihood-only but the angle has a tight prior, so the step gain along it scales as
+# 1 / photons; this keeps it where it was tuned (the fits diverge once it passes ~2)
+angle_step_scale = 10 ** (float(src.log_flux) - 7.581)
+
 # creating telescopes
 lin_det = dLux.LayeredDetector([("Downsample", dLux.Downsample(oversample))])
 shm_det = lin_det
@@ -246,8 +255,11 @@ cov_params = {
 }
 
 # NOTE make sure to ROUND data before passing here.
+# The variance is floored at 1 count: the faintest pixels expect ~6 photons, so ~2% of
+# Poisson draws have a zero pixel, and scale 0 makes the loss NaN. Draws without a zero
+# pixel are unaffected, and no noiseless pixel is below 5 counts.
 likelihood_fn = lambda model, data: jsp.stats.norm.logpdf(
-    model.jitter_model(), data, scale=np.sqrt(data)
+    model.jitter_model(), data, scale=np.sqrt(np.maximum(data, 1.0))
 )
 
 posterior_fn = lambda model, data, args: likelihood_fn(model, data).sum() + prior_fn(
@@ -255,7 +267,7 @@ posterior_fn = lambda model, data, args: likelihood_fn(model, data).sum() + prio
 )
 
 mvn_likelihood_fn = lambda model, data: jsp.stats.norm.logpdf(
-    model.model(), data, scale=np.sqrt(data)
+    model.model(), data, scale=np.sqrt(np.maximum(data, 1.0))
 )
 
 mvn_posterior_fn = lambda model, data, args: mvn_likelihood_fn(
@@ -313,6 +325,16 @@ def calc_cov(model, params, ll_fn, *ll_args):
         *ll_args,
         save_memory=False,
     )
+
+
+def own_image(model_key, model):
+    """
+    The model's own noiseless image. Using it as the data in calc_cov gives the expected
+    Fisher at the fit's starting point, which is positive definite; the mismatched data of
+    another jitter model can make the Hessian indefinite, and the preconditioned step then
+    goes uphill. For a model fitting its own kind of data the two are identical.
+    """
+    return model.jitter_model() if model_key in ("lin", "shm") else model.model()
 
 
 def zero_offdiags(params, cov_params, cov_mat):
@@ -384,7 +406,7 @@ for ang in np.array([0.0, 45.0, 90.0]):
                 models[model_key],
                 cov_params[model_key],
                 jitted_loglike_fns[model_key],
-                data,
+                own_image(model_key, models[model_key]),
             )
             for model_key in models.keys()
         }
@@ -411,7 +433,7 @@ for ang in np.array([0.0, 45.0, 90.0]):
                 models[model_key],
                 cov_params[model_key],
                 jitted_loglike_fns[model_key],
-                data,
+                own_image(model_key, models[model_key]),
             )
             for model_key in models.keys()
         }
@@ -436,7 +458,7 @@ for ang in np.array([0.0, 45.0, 90.0]):
                 models[model_key],
                 cov_params[model_key],
                 jitted_loglike_fns[model_key],
-                data,
+                own_image(model_key, models[model_key]),
             )
             for model_key in models.keys()
         }
@@ -460,7 +482,7 @@ for ang in np.array([0.0, 45.0, 90.0]):
                 models[model_key],
                 cov_params[model_key],
                 jitted_loglike_fns[model_key],
-                data,
+                own_image(model_key, models[model_key]),
             )
             for model_key in models.keys()
         }
@@ -556,6 +578,11 @@ def run_grad_desc(
 
         # Updating
         updates, opt_state = optim.update(grads, opt_state)
+        if "Jitter.r" in params:
+            # at most halve or double r per step: crossing zero hits the clip floor, where the
+            # sqrt(r) in the covariance and the Weibull prior give huge gradients
+            r = model.get("Jitter.r")
+            updates = updates.set("Jitter.r", np.clip(updates.get("Jitter.r"), -0.5 * r, r))
         model = zdx.apply_updates(model, updates)
         model = norm_fn(model, args)
 
@@ -682,8 +709,9 @@ def grad_fn(grads, args={}):
 
         match data_key:
             case "mvn0":
+                # mag is Jitter.r here; 1e-6 / mag keeps the step tuned with r in 1e-6 arcsec^4
                 grads = (
-                    grads.multiply("Jitter.shear", 1 / mag)
+                    grads.multiply("Jitter.shear", 1e-6 / mag)
                     if "Jitter.shear" in optimisers
                     else grads
                 )
@@ -715,7 +743,7 @@ def grad_fn(grads, args={}):
                     else grads
                 )
                 grads = (
-                    grads.multiply("jitter_angle", m**2)
+                    grads.multiply("jitter_angle", m**2 * angle_step_scale)
                     if "jitter_angle" in optimisers
                     else grads
                 )
@@ -728,7 +756,7 @@ def grad_fn(grads, args={}):
                     else grads
                 )
                 grads = (
-                    grads.multiply("jitter_angle", m**4)
+                    grads.multiply("jitter_angle", m**4 * angle_step_scale)
                     if "jitter_angle" in optimisers
                     else grads
                 )
@@ -741,7 +769,7 @@ def grad_fn(grads, args={}):
                     else grads
                 )
                 grads = (
-                    grads.multiply("jitter_angle", 1e2 * m**4)
+                    grads.multiply("jitter_angle", 1e2 * m**4 * angle_step_scale)
                     if "jitter_angle" in optimisers
                     else grads
                 )
@@ -768,7 +796,7 @@ def norm_fn(model, args={}):
         model = model.set("Jitter.shear", shear)
 
         det = model.get("Jitter.r")
-        det = np.clip(det, min=1e-16, max=None)
+        det = np.clip(det, min=1e-22, max=None)  # arcsec^4
         model = model.set("Jitter.r", det)
 
     elif model_key == "lin" or model_key == "shm":
@@ -783,9 +811,11 @@ def norm_fn(model, args={}):
 from zodiax.optimisation import sgd, adam
 
 sep_dict_save_dir = nt_files_path + "results/xfit/"
+os.makedirs(sep_dict_save_dir, exist_ok=True)  # git does not track the empty folder
 
 
 sep_dict = {}
+# keep a multiple of 9 (3 angles x 3 mags): realisation i uses grid point i % 9, so each grid point gets equal weight
 n_realisations = 180
 
 
@@ -919,7 +949,8 @@ for model_key in tqdm(models.keys(), desc="Models"):
 
 # saving
 current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-save_str = current_time + f"_{n_realisations:04d}.npy"
+# random tag so array tasks that finish in the same second cannot overwrite each other
+save_str = current_time + f"_{n_realisations:04d}_{secrets.token_hex(2)}.npy"
 np.save(os.path.join(sep_dict_save_dir, save_str), sep_dict)
 
 # %%

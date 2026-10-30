@@ -14,16 +14,17 @@ from equinox import tree_at
 Params = Union[str, List[str]]
 
 
+# det is GaussianJitter's r: the determinant of the jitter covariance, in arcsec^4
 def fwhm_to_det(fwhm, shear):
-    return 1e6 * (1 - shear) ** 2 * (fwhm / 2.35482) ** 4
+    return (1 - shear) ** 2 * (fwhm / 2.35482) ** 4
 
 
 def det_to_fwhm(det, shear):
-    return 2.35482 * ((det / 1e6) / (1 - shear) ** 2) ** 0.25
+    return 2.35482 * (det / (1 - shear) ** 2) ** 0.25
 
 
 def get_shear(fwhm, det):
-    return 1 - np.sqrt((det / 1e6) / (fwhm / 2.35482) ** 4)
+    return 1 - np.sqrt(det / (fwhm / 2.35482) ** 4)
 
 
 def powspace(start, stop, power, num):

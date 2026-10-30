@@ -16,17 +16,20 @@ import zodiax as zdx
 import dLuxToliman as dlT
 import dLux
 from tqdm import tqdm
+import os
 
 save_ram = False
-nt_files_path = "/fred/oz440/max/code/tolicode/files/"
+# Outputs go into this repository (results/, figs/), wherever the script is launched from
+nt_files_path = os.path.dirname(os.path.abspath(__file__)) + "/"
 
 
+# det is GaussianJitter's r: the determinant of the jitter covariance, in arcsec^4
 def fwhm_to_det(fwhm, shear):
-    return 1e6 * (1 - shear) ** 2 * (fwhm / 2.35482) ** 4
+    return (1 - shear) ** 2 * (fwhm / 2.35482) ** 4
 
 
 def det_to_fwhm(det, shear):
-    return 2.35482 * ((det / 1e6) / (1 - shear) ** 2) ** 0.25
+    return 2.35482 * (det / (1 - shear) ** 2) ** 0.25
 
 
 def powspace(start, stop, power, num):
@@ -124,7 +127,7 @@ test_shears = np.array([0, 0.3])
 test_shears = np.array([0, 0.3, 0.7])
 test_rs = powspace(
     fwhm_to_det(1e-1 * det_pscale, test_shears[0]),
-    100,
+    1e-4,  # arcsec^4: sigma = 0.1 arcsec for a symmetric kernel
     # fwhm_to_det(1.01 * det_pscale, test_shears[0]),
     2,
     30,
@@ -340,6 +343,6 @@ ax22.xaxis.set_minor_locator(
 )  # 5 minor ticks between major ticks
 ax22.set_xlabel("FWHM of semi-major axis [arcsec]")
 
-plt.savefig(nt_files_path + "/paper_figs/norm_sweep.png", bbox_inches="tight", dpi=500)
-plt.savefig(nt_files_path + "/paper_figs/norm_sweep.pdf", bbox_inches="tight", dpi=500)
+plt.savefig(nt_files_path + "figs/norm_sweep.png", bbox_inches="tight", dpi=500)
+plt.savefig(nt_files_path + "figs/norm_sweep.pdf", bbox_inches="tight", dpi=500)
 plt.close()

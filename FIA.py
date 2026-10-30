@@ -16,9 +16,11 @@ import zodiax as zdx
 import dLuxToliman as dlT
 import dLux
 from tqdm import tqdm
+import os
 
 save_ram = False
-nt_files_path = "/fred/oz440/max/code/tolicode/files/"
+# Outputs go into this repository (results/, figs/), wherever the script is launched from
+nt_files_path = os.path.dirname(os.path.abspath(__file__)) + "/"
 
 
 ################## MODEL SETUP ##################
