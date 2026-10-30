@@ -1,0 +1,55 @@
+# Environment for the analysis in Charles et al. 2026, JATIS 12(2), 028005.
+#
+#   conda env create -f environment.yml
+#   conda activate toliman-jitter
+#
+# The original environment was not recorded. These pins started as a reconstruction of
+# it, then moved to dLuxToliman v0.4.1 for the reanalysis with the corrected photon count.
+name: toliman-jitter
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.12
+  - pip
+  - ipykernel
+  - ipywidgets
+  - pip:
+      # GPU (default): jax[cuda12] pulls in jaxlib==0.8.1, the CUDA 12 plugin and the
+      # pip-installed CUDA/cuDNN libraries, so no separate jaxlib line is needed.
+      # FIA.py, FIA_mvn.py and crossfitting.py set jax_platform_name="gpu", and fail
+      # with "Unknown backend: 'gpu'" on a CPU-only install.
+      - jax[cuda12]==0.8.1
+      # CPU only: replace the jax[cuda12] line above with the two lines below, and set
+      # jax_platform_name to "cpu" in FIA.py, FIA_mvn.py and crossfitting.py.
+      #   - jax==0.8.1
+      #   - jaxlib==0.8.1
+      - equinox==0.13.2
+      # zodiax.get_optimiser at the commit below breaks on optax >= 0.2.7 (dLux issue #306)
+      - optax==0.2.6
+      - jaxtyping==0.3.3
+      - numpy==2.3.5
+      - scipy==1.16.3
+      - matplotlib==3.10.7
+      - tqdm==4.67.1
+      - SciencePlots==2.2.0
+      - cmasher==1.9.2
+      # dLuxToliman 0.4.1 needs dLux >= 0.14.3, < 0.15; 0.15+ needs zodiax >= 0.5, which
+      # dropped the API these scripts use
+      - dLux==0.14.3
+      # dLux 0.14.3 needs interpax; lineax 0.1.0 is the newest that keeps jax at 0.8.1
+      # (0.1.1 needs jax >= 0.10)
+      - interpax==0.3.15
+      - lineax==0.1.0
+      # No PyPI release of zodiax has that API (0.4.1 is too old, 0.5.0 too new).
+      # This commit is main as of Feb-Nov 2025. Later commits make the sgd/adam
+      # learning-rate schedule subnormal, which underflows to zero on CPU. It reports
+      # version 0.5.0, which satisfies dLuxToliman's zodiax==0.5.*.
+      - zodiax @ git+https://github.com/LouisDesdoigts/zodiax@eb6e51a2a2c4fa1a77ec7b1bc08b9894d0498da9
+      # v0.4.1, which has: #38, the jitter blur applied in Fourier space, so sub-pixel and
+      # sheared kernels get the requested width; #33, z_oversize=1.01, so the Zernike basis
+      # covers the whole aperture; #35, GaussianJitter's r = det(Sigma) in arcsec^4 (the 2026
+      # paper used 1e-6 arcsec^4); and NaN-free JitteredToliman gradients at jitter_mag = 0
+      - dLuxToliman @ git+https://github.com/maxecharles/dLuxToliman@454b2429c8e6a9b2d50091bee10efcc54f126aca
+
+# photon_count.ipynb is separate: it ran in a Python 3.6 env with pysynphot and
+# needs the STScI reference data described in the notebook.

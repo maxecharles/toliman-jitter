@@ -16,9 +16,11 @@ import zodiax as zdx
 import dLuxToliman as dlT
 import dLux
 from tqdm import tqdm
+import os
 
 save_ram = False
-nt_files_path = "/fred/oz440/max/code/tolicode/files/"
+# Outputs go into this repository (results/, figs/), wherever the script is launched from
+nt_files_path = os.path.dirname(os.path.abspath(__file__)) + "/"
 
 
 ################## MODEL SETUP ##################
@@ -60,7 +62,7 @@ src = dlT.AlphaCen(
     position_angle=np.array(90.0),
     x_position=np.array(0.0),
     y_position=np.array(0.0),
-    log_flux=np.array(7.581),
+    log_flux=np.array(6.979),
     contrast=np.array(3.37),
 )
 
